@@ -1,0 +1,19 @@
+{
+  "name": "voxel-tetris",
+  "version": "0.0.1",
+  "description": "play tetris in voxel.js",
+  "main": "index.js",
+  "devDependencies": {
+    "voxel-engine": "~0.1.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tatarize/voxel-tetris"
+  },
+  "keywords": [
+    "voxel",
+    "game",
+    "tree",
+    "forest"
+  ]
+}
