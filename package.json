@@ -1,6 +1,6 @@
 {
   "name": "voxel-tetris",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "play tetris in voxel.js",
   "main": "index.js",
   "devDependencies": {
@@ -13,7 +13,7 @@
   "keywords": [
     "voxel",
     "game",
-    "tree",
-    "forest"
+    "tetris",
+    "fun"
   ]
 }

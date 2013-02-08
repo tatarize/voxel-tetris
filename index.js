@@ -18,26 +18,71 @@ module.exports = function(game,opts) {
     var pieces = [];
     var droplocation;
     var time = 0;
-  
-  
-    //TODO: Check Collide Spin.
-    //TODO: Line vanish on complete.
-    //TODO: Game Over on Fail.
-    this.spin = function(pindex, cw) {
-        if (!pieces) return;
-        if (pieces.length == 0) return;
-        if (pieces.length <= pindex) return;
-        var piece = pieces[pindex];
-        if (!cw) cw = 1;
-        unshow(piece);
-        for (var i = 0; i < piece.length; i++) {
-            var nx = piece[i].corey * cw;
-            var ny = -piece[i].corex * cw;
-            piece[i].corex = nx;
-            piece[i].corey = ny;
-            repos(piece[i]);
+      
+    this.command = function(c,pindex) {
+        if (!pindex) pindex = 0;
+            switch(c){
+                case 0:
+                    spin(pindex,1);
+                    break;
+                case 1:
+                    spin(pindex,-1);
+                    break;
+                case 2:
+                    move(pindex,1,0,0);
+                    break;
+                case 3:
+                    move(pindex,-1,0,0);
+                    break;
+            }
+    }
+    this.touch = function(pos) {
+        if (pos.x > (opts.pos.x + (opts.width*size))) {
+            command(2);
+            return;
         }
-        show(piece);
+        if (pos.x < (opts.pos.x)) {
+            command(3);
+            return;
+        }
+        var face = Math.abs(Math.floor(pos.y))%2;
+        command(face);
+    }
+    this.spin = function(pindex, cw, failop) {
+        var piece = pieces[pindex];
+        unshow(piece);
+        piece.spin += cw;
+        reposition(piece);
+        if (!isValid(piece)) {
+            piece.spin -= cw;
+            reposition(piece);
+            show(piece);
+            if (failop) failop();
+        }
+        else {
+            show(piece);
+        }
+        flush();
+    }
+        
+    this.move = function (pindex, mx, my, mz, failop) {
+        var piece = pieces[pindex];
+        unshow(piece);
+        piece.dx += mx;
+        piece.dy += my;
+        piece.dz += mz;
+        reposition(piece);
+        if (!isValid(piece)) {
+            piece.dx -= mx;
+            piece.dy -= my;
+            piece.dz -= mz;    
+            reposition(piece);
+            show(piece);
+            if (failop) failop();
+        }
+        else {
+            show(piece);
+        }
         flush();
     }
     
@@ -51,7 +96,7 @@ module.exports = function(game,opts) {
         }
         for (var k = m; k < opts.height; k++) {
             for (var j = 0; j < opts.width; j++) {
-                voxels.voxelAtPosition({
+                set({
                     x: opts.pos.x + (j * size), 
                     y: opts.pos.y + (k * size), 
                     z: opts.pos.z
@@ -106,7 +151,7 @@ module.exports = function(game,opts) {
     }
     this.clearBoard = function() {
         var x = opts.pos.x, y = opts.pos.y, z = opts.pos.z;
-        for (var m = 0; m < opts.height; m++) {
+        for (var m = 0; m < opts.height+5; m++) {
             for (var n = 0; n < opts.width; n++) {
                 set({
                     x: x + size*n , 
@@ -152,43 +197,48 @@ module.exports = function(game,opts) {
         
     this.makePiece = function(pos, type) {
         if (!pos) pos = droplocation;
-        if (!type) type = Math.floor(Math.random() * 4) % 7;
+        if (!type) type = Math.floor((Math.random() * 7));
         var piece = [];
         switch (type) {
-            case 1:
-            case 2:
-            case 3:
-            case 0:
-                piece[0] = {
-                    corex: -1, 
-                    corey: 0,
-                    corez: 0
-                };
-                piece[1] = {
-                    corex: 0, 
-                    corey: 0,
-                    corez: 0
-                };
-                piece[2] = {
-                    corex: 1, 
-                    corey: 0,
-                    corez: 0
-                };
-                piece[3] = {
-                    corex: 2, 
-                    corey: 0,
-                    corez: 0
-                };
+            case 0: //block
+                piece = [{corex: 0, corey: 0, corez: 0}, {corex: 0, corey: 1, corez: 0},{corex: 1, corey: 0, corez: 0},{corex: 1, corey: 1, corez: 0}]
+                break;
+
+            case 1: //long
+                piece = [{corex: -1, corey: 0, corez: 0}, {corex: 0, corey: 0, corez: 0},{corex: 1, corey: 0, corez: 0},{corex: 2, corey: 0, corez: 0}]
+                break;
+
+            case 2: //L
+                piece = [{corex: 0, corey: -2, corez: 0}, {corex: 0, corey: -1, corez: 0},{corex: 0, corey: 0, corez: 0},{corex: 1, corey: 0, corez: 0}]
+                break;
+
+            case 3: //Inverted L
+                piece = [{corex: 0, corey: -2, corez: 0}, {corex: 0, corey: -1, corez: 0},{corex: 0, corey: 0, corez: 0},{corex: -1, corey: 0, corez: 0}]
+                break;
+
+            case 4: //T
+                piece = [{corex: -1, corey: 0, corez: 0}, {corex: 0, corey: 0, corez: 0},{corex: 1, corey: 0, corez: 0},{corex: 0, corey: 1, corez: 0}]
+                break;
+
+            case 5://S
+                piece = [{corex: 0, corey: 1, corez: 0}, {corex: 0, corey: 0, corez: 0},{corex: -1, corey: 0, corez: 0},{corex: -1, corey: -1, corez: 0}]
+                break;
+
+            case 6://Inverted S
+                piece = [{corex: 0, corey: 1, corez: 0}, {corex: 0, corey: 0, corez: 0},{corex: 1, corey: 0, corez: 0},{corex: 1, corey: -1, corez: 0}]
                 break;
         }
-        for (var i = 0; i < piece.length; i++) {
-            piece[i].initx = pos.x;
-            piece[i].inity = pos.y;
-            piece[i].initz = pos.z;
-            piece[i].dx = 0;
-            piece[i].dy = 0;
-            piece[i].dz = 0;
-            repos(piece[i]);
+        piece.material = type+1;
+        piece.initx = pos.x;
+        piece.inity = pos.y;
+        piece.initz = pos.z;
+        piece.dx = 0;
+        piece.dy = 0;
+        piece.dz = 0;
+        piece.spin = 0;
+        reposition(piece);
+        if (!isValid(piece)) {
+            clearBoard();
         }
         show(piece);
         if (!pieces) pieces = [];
@@ -196,83 +246,59 @@ module.exports = function(game,opts) {
         flush();
     }
     
-    var reposition = function(piece) {
+    this.reposition = function(piece) {
         for (var i = 0; i < piece.length; i++) {
-            repos(piece[i]);
+            var block = piece[i];
+            var nx;
+            var ny;
+            var nz = block.corez;
+            var spin = piece.spin;
+            while (spin < 0) spin+=4;
+            spin %= 4;
+            switch (spin) {
+                case 0:
+                    nx = block.corex;
+                    ny = block.corey;
+                    break;            
+                case 1:
+                    nx = block.corey;
+                    ny = -block.corex;
+                    break;
+                case 2:
+                    nx = -block.corex;
+                    ny = -block.corey;
+                    break;
+                case 3:
+                    nx = -block.corey;
+                    ny = block.corex;
+            }
+            block.x = ((nx + piece.dx) * size) + piece.initx;
+            block.y = ((ny + piece.dy) * size) + piece.inity;
+            block.z = ((nz + piece.dz) * size) + piece.initz;
         }
-    }
-    
-    var repos = function(block) {
-        block.x = ((block.corex + block.dx) * size) + block.initx;
-        block.y = ((block.corey + block.dy) * size) + block.inity;
-        block.z = ((block.corez + block.dz) * size) + block.initz;
     }
     
     var show = function(piece) {
         for (var i = 0; i < piece.length; i++) {
-            set(piece[i],1);
+            set(piece[i],piece.material);
         }
     }
     
-    var unshow = function unshow(piece) {
+    var unshow = function(piece) {
         for (var i = 0; i < piece.length; i++) {
             set(piece[i],0);
         }
     }
+
     
-    this.move = function (pindex, mx, my, mz, failop) {
-        var piece = pieces[pindex];
-        unshow(piece);
-        if (checkCollide(piece,mx,my,mz)) {
-            show(piece);
-            flush();
-            if (failop) failop();
-            return;
-        }
+    function isValid(piece) {
         for (var i = 0; i < piece.length; i++) {
-            piece[i].dx += mx;
-            piece[i].dy += my;
-            piece[i].dz += mz;
+            if (voxels.voxelAtPosition(piece[i])) return false;
         }
-        reposition(piece);
-        show(piece);
-        flush();
-    }
-    
-    function checkCollide(piece, dx, dy, dz) {
-        for (var i = 0; i < piece.length; i++) {
-            if (voxels.voxelAtPosition({
-                x: piece[i].x + (dx * size), 
-                y: piece[i].y + (dy * size), 
-                z: piece[i].z + (dz * size)
-            })) return true;
-        }
-        return false; 
-    }
-    
-    this.touch = function(pos) {
-        var face = Math.floor(pos.y/size) % 4;
-        for (var i = 0; i < pieces.length; i++) {
-            switch(face){
-                case 0:
-                    spin(i,1);
-                    break;
-                case 1:
-                    spin(i,-1);
-                    break;
-                case 2:
-                    move(i,1,0,0);
-                    break;
-                case 3:
-                    move(i,-1,0,0);
-                    break;
-            }
-        }
+        return true;
     }
     
     function set (posxyz, value) {
-        var ex = voxels.voxelAtPosition(posxyz);
-        if (ex) true;
         voxels.voxelAtPosition(posxyz, value);
         var c = voxels.chunkAtPosition(posxyz);
         var key = c.join('|');
