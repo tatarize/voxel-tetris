@@ -10,33 +10,74 @@ module.exports = function(game,opts) {
     if (!opts.width) opts.width = 10;
     if (!opts.height) opts.height = 20;
     if (!opts.material) opts.material = 1;
-    if (!opts.droprate) opts.droprate = 10;
+    if (!opts.droprate) opts.droprate = 25;
+    if (!opts.levels) opts.levels = [1,5,10,25,50,100,200,500,1000,50000];
+    if (!opts.speedincrease) opts.speedincrease = 0.20;
     
     var voxels = game.voxels;
     var size = voxels.cubeSize;
     
     var pieces = [];
     var droplocation;
+    var droprate = opts.droprate;
     var time = 0;
+    var rowsremoved = 0;
       
     this.command = function(c,pindex) {
         if (!pindex) pindex = 0;
-            switch(c){
-                case 0:
-                    spin(pindex,1);
-                    break;
-                case 1:
-                    spin(pindex,-1);
-                    break;
-                case 2:
-                    move(pindex,1,0,0);
-                    break;
-                case 3:
-                    move(pindex,-1,0,0);
-                    break;
-            }
+        switch(c){
+            case 0:
+                spin(pindex,1);
+                break;
+            case 1:
+                spin(pindex,-1);
+                break;
+            case 2:
+                move(pindex,1,0,0);
+                break;
+            case 3:
+                move(pindex,-1,0,0);
+                break;
+            case 4:
+                moveDown(pindex);
+                break;
+            case 5:
+                slam(pindex);
+                break;
+        }
     }
+    this.slam = function(pindex) {
+        if (!pindex) pindex = 0;
+        var piece = pieces[pindex];
+        unshow(piece);
+        do {
+            piece.dy -= 1; 
+            reposition(piece);
+        } while (isValid(piece));
+        piece.dy += 1;
+        reposition(piece);
+        show(piece);
+        flush();
+        checkRows();
+        pieces.pop();
+    }
+    this.moveDown = function(pindex) {
+        if (!pindex) pindex = 0;
+        move(pindex,0,-1,0,function() {
+            checkRows();
+            pieces.pop();
+        });
+    }
+    
     this.touch = function(pos) {
+        if (pos.y < (opts.pos.y - size)) {
+            command(5);
+            return;
+        }
+        if (pos.y < opts.pos.y) {
+            command(4);
+            return;
+        }
         if (pos.x > (opts.pos.x + (opts.width*size))) {
             command(2);
             return;
@@ -45,9 +86,9 @@ module.exports = function(game,opts) {
             command(3);
             return;
         }
-        var face = Math.abs(Math.floor(pos.y))%2;
-        command(face);
+        command(0); //no longer turn the other direction.
     }
+    
     this.spin = function(pindex, cw, failop) {
         var piece = pieces[pindex];
         unshow(piece);
@@ -58,11 +99,13 @@ module.exports = function(game,opts) {
             reposition(piece);
             show(piece);
             if (failop) failop();
+            return false;
         }
         else {
             show(piece);
         }
         flush();
+        return true;
     }
         
     this.move = function (pindex, mx, my, mz, failop) {
@@ -79,11 +122,13 @@ module.exports = function(game,opts) {
             reposition(piece);
             show(piece);
             if (failop) failop();
+            return false;
         }
         else {
             show(piece);
         }
         flush();
+        return true;
     }
     
     this.removeRow = function(m) {
@@ -104,11 +149,32 @@ module.exports = function(game,opts) {
                     x: opts.pos.x + (j * size), 
                     y: opts.pos.y + ((k+1) * size),
                     z: opts.pos.z
-                })); 
+                }));
             }
         }
+        rowsremoved++;
+        checkLevel();
         flush();
     }
+    this.checkLevel  = function() {
+        for (var i = 0; i < opts.levels.length; i++) {
+            if (rowsremoved == opts.levels[i]) {
+                setBoard(i);
+                faster();
+                return;
+            }
+            if (rowsremoved < opts.levels[i]) {
+                return;
+            }
+        }
+    }
+    this.gameOver = function() {
+        clearBoard();
+        resetSpeed();
+        setBoard(opts.material);
+        rowsremoved = 0;
+    }
+    
     this.checkRows = function() {
         var row;
         for (var m = 0; m < opts.height; m++) {
@@ -137,17 +203,23 @@ module.exports = function(game,opts) {
 
         if (!pieces) return;
         for (var i = 0; i < pieces.length; i++) {
-            move(i,0,-1,0,function() {
-                checkRows();
-                pieces.pop();
-            });
+            moveDown(i);
         }
     }
     this.tick = function () {
         time++;
-        if (time % 25 == 1) {
+        if (time % droprate == 0) {
             doTick();
         }
+    }
+    this.faster = function() {
+        droprate = Math.ceil(droprate * (1-opts.speedincrease));
+    }
+    this.slower = function() {
+        droprate = Math.ceil(droprate * (1-opts.speedincrease));
+    }
+    this.resetSpeed = function() {
+        droprate = opts.droprate;
     }
     this.clearBoard = function() {
         var x = opts.pos.x, y = opts.pos.y, z = opts.pos.z;
@@ -161,40 +233,46 @@ module.exports = function(game,opts) {
             }
         }
     }
-    
-    this.makeBoard = function() {
+    this.setBoard = function(material) {
         var x = opts.pos.x, y = opts.pos.y, z = opts.pos.z;
-        clearBoard();
+        if (!material) material = opts.material;
         
         for (var m = -1; m <= opts.height; m++) {
             set({
                 x: x -1,                
                 y: y+size*m, 
                 z: z
-            }, opts.material);
+            }, material);
             set({
                 x: x + size*opts.width, 
                 y: y+size*m, 
                 z: z
-            }, opts.material);
+            }, material);
         }
         for (var q = -1; q <= opts.width; q++) {
             set({
                 x: x + size * q , 
                 y: y - 1*size, 
                 z: z
-            }, opts.material);
+            }, material);
         }
-        droplocation = {
-            x: x + (opts.width * size)/2, 
-            y: y+(opts.height * size), 
-            z: z
-        };
-        flush();
     }
     
-    makeBoard();  
-        
+    this.setDroplocation = function(x,y,z) {
+        droplocation = {
+            x: x, 
+            y: y, 
+            z: z
+        };
+    }
+    this.makeBoard = function() {
+        var x = opts.pos.x, y = opts.pos.y, z = opts.pos.z;
+        clearBoard();
+        setBoard(opts.material);
+        setDroplocation(x + (opts.width * size)/2,y + (opts.height * size),z);
+        flush();
+    }
+
     this.makePiece = function(pos, type) {
         if (!pos) pos = droplocation;
         if (!type) type = Math.floor((Math.random() * 7));
@@ -238,7 +316,7 @@ module.exports = function(game,opts) {
         piece.spin = 0;
         reposition(piece);
         if (!isValid(piece)) {
-            clearBoard();
+            gameOver();
         }
         show(piece);
         if (!pieces) pieces = [];
@@ -313,5 +391,8 @@ module.exports = function(game,opts) {
         });
     }
     
+    
+        
+    makeBoard();
     return this;
 };
